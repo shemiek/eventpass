@@ -1,0 +1,9 @@
+{
+  "name": "EventPass",
+  "short_name": "EventPass",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F1EC",
+  "theme_color": "#1C2544",
+  "icons": []
+}

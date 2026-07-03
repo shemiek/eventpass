@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  color: #12172B;
+}
+
+.ticket-edge {
+  position: relative;
+}
+.ticket-edge::before,
+.ticket-edge::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: #F4F1EC;
+  border-radius: 999px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.ticket-edge::before { left: -12px; }
+.ticket-edge::after { right: -12px; }
+
+.perforation {
+  background-image: radial-gradient(circle, #F4F1EC 5px, transparent 5.5px);
+  background-size: 16px 16px;
+  background-position: center;
+  width: 100%;
+  height: 1px;
+}
+
+:focus-visible {
+  outline: 2px solid #F2A93B;
+  outline-offset: 2px;
+}
