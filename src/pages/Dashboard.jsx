@@ -18,7 +18,7 @@ export default function Dashboard() {
     // RLS ensures this only returns events the user owns or is staff on
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, slug, event_date, banner_url, owner_id')
+      .select('id, title, slug, event_date, banner_url, owner_id, status')
       .order('created_at', { ascending: false })
     if (!error) setEvents(data)
     setLoading(false)
@@ -56,7 +56,12 @@ export default function Dashboard() {
               style={ev.banner_url ? { backgroundImage: `url(${ev.banner_url})` } : {}}
             />
             <div className="p-4">
-              <p className="font-display font-semibold text-ink">{ev.title}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-display font-semibold text-ink">{ev.title}</p>
+                {ev.status === 'draft' && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-mist font-medium">Draft</span>
+                )}
+              </div>
               <p className="text-sm text-mist mt-1">
                 {ev.event_date ? new Date(ev.event_date).toLocaleString() : 'Date TBD'}
               </p>

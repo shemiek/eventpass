@@ -7,22 +7,21 @@ export default function RegistrationSuccess() {
   const { code } = useParams()
   const [registration, setRegistration] = useState(null)
   const [event, setEvent] = useState(null)
+  const [tierName, setTierName] = useState(null)
   const [notFound, setNotFound] = useState(false)
 
-  useEffect(() => {
-    load()
-  }, [code])
+  useEffect(() => { load() }, [code])
 
   async function load() {
-    const { data: reg, error } = await supabase
-      .from('registrations')
-      .select('*')
-      .eq('ticket_code', code)
-      .single()
+    const { data: reg, error } = await supabase.from('registrations').select('*').eq('ticket_code', code).single()
     if (error || !reg) { setNotFound(true); return }
     setRegistration(reg)
     const { data: ev } = await supabase.from('events').select('*').eq('id', reg.event_id).single()
     setEvent(ev)
+    if (reg.ticket_type_id) {
+      const { data: tt } = await supabase.from('ticket_types').select('name').eq('id', reg.ticket_type_id).single()
+      setTierName(tt?.name || null)
+    }
   }
 
   async function download() {
@@ -41,17 +40,11 @@ export default function RegistrationSuccess() {
   return (
     <div className="max-w-lg mx-auto px-4 py-8">
       <p className="text-center text-sm text-mist mb-4">
-        {registration.checked_in ? 'You are checked in. ' : "You're registered! "}
-        Show this QR code at check-in.
+        {registration.checked_in ? 'You are checked in. ' : "You're registered! "}Show this QR code at check-in.
       </p>
-      <TicketBadge event={event} registration={registration} />
+      <TicketBadge event={event} registration={registration} tierName={tierName} />
       <div className="text-center mt-5">
-        <button
-          onClick={download}
-          className="bg-navy text-paper font-medium rounded-lg px-5 py-2.5 hover:bg-ink transition"
-        >
-          Download badge
-        </button>
+        <button onClick={download} className="bg-navy text-paper font-medium rounded-lg px-5 py-2.5 hover:bg-ink transition">Download badge</button>
       </div>
     </div>
   )

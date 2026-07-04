@@ -1,13 +1,22 @@
-# EventPass
+# EventoPass
 
 Mobile-friendly event registration, custom forms, digital badges, and QR check-in — built to run entirely on free tiers (Supabase + Vercel/Netlify).
 
 ## What it does
 
-- **Organizers** create events with a banner, description, and a custom registration form (any mix of text/email/phone/select/checkbox/textarea fields).
-- **Attendees** register from a phone browser (no app install) and get a **digital badge** with a unique QR ticket, downloadable as an image.
-- **Staff** (organizer + anyone added by email) scan attendee QR codes using their phone's **camera** to check people in, with instant duplicate detection.
-- **Dashboard** shows live registration/check-in counts and exports attendees to CSV.
+- **Ticket tiers** with per-tier capacity and optional pricing (e.g. VIP: 50 seats, General: 200)
+- **Multi-session agendas** — attendees pick which sessions they'll attend
+- **Draft/Published events** — hide an event from the public link until it's ready
+- **Overall capacity caps** with automatic "sold out" / registration-closed handling
+- **Role-based team access** — invite teammates by email as **Manager** (edit event, manage team, export data) or **Scanner** (check-in only); access activates the moment they sign up with that email
+- **Badge customization** — accent color and footer text per event
+- **Camera-based check-in** with gate tracking, plus a **check-out** option (timestamps logged per check-in/out event)
+- **Manual walk-in check-in** for attendees who didn't pre-register
+- **Bulk CSV import** of pre-registered attendees
+- **Search/filter/sort** the attendee table (by name, email, ticket code, status, tier)
+- **Analytics** — registrations-over-time chart and ticket tier breakdown
+- **CSV and Excel export** (Excel includes a Registrations sheet + a Summary sheet)
+- **VIP flagging and notes**, visible in the attendee table and to staff during scanning
 
 Everything is a single responsive web app (installable as a PWA — "Add to Home Screen") so there's no App Store step.
 
@@ -16,9 +25,9 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 ## 1. Set up Supabase (free tier)
 
 1. Go to https://supabase.com → create a free account → **New project**.
-2. Once it's provisioned, open **SQL Editor** → paste the entire contents of `supabase/schema.sql` → **Run**.
-   This creates the `events` and `registrations` tables, all Row Level Security policies, and a public `banners` storage bucket.
-3. Go to **Project Settings → API**. Copy:
+2. Open **SQL Editor** → paste the entire contents of `supabase/schema.sql` → **Run**.
+3. Then run `supabase/schema_v2.sql` the same way — this adds ticket tiers, sessions, roles, check-in gates, and badge customization on top of the base schema.
+4. Go to **Project Settings → API**. Copy:
    - **Project URL**
    - **anon public** key
 
