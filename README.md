@@ -18,6 +18,8 @@ Mobile-friendly event registration, custom forms, digital badges, and QR check-i
 - **Manual walk-in check-in**, **bulk CSV import**, and **name/mobile search** in the scanner (for when a QR code isn't available)
 - **Dashboard as its own tab** with toggleable widgets and **PDF/CSV export** of the summary metrics
 - **CSV and Excel export** of full attendee data (Excel includes a Registrations sheet + Summary sheet)
+- **Public marketing landing page** at the root URL for signed-out visitors, with a dashboard redirect for logged-in users
+- **WhatsApp sharing** — share the registration link with invitees, or share an attendee's badge image directly via the native share sheet (falls back to a text link on desktop, where file-sharing isn't available)
 - **Delete event**, with an explicit warning showing exactly how much data will be lost, gated to the event owner
 - **VIP flagging and notes**, visible in the attendee table and to staff during scanning
 

@@ -34,12 +34,9 @@ export default function Login() {
 
   return (
     <div className="max-w-sm mx-auto mt-16 px-4">
-      <h1 className="font-display text-2xl font-semibold text-ink mb-1">
+      <h1 className="font-display text-2xl font-semibold text-ink mb-6">
         {mode === 'signup' ? 'Create your organizer account' : 'Sign in'}
       </h1>
-      <p className="text-mist text-sm mb-6">
-        Organizers and check-in staff use the same sign-in. Staff access is granted per event by email.
-      </p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>

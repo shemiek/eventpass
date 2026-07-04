@@ -1,8 +1,9 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/useAuth'
 import { configError } from './lib/supabaseClient'
 import Navbar from './components/Navbar'
 
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import EventForm from './pages/EventForm'
@@ -20,6 +21,8 @@ function Protected({ user, loading, children }) {
 
 export default function App() {
   const { user, loading } = useAuth()
+  const location = useLocation()
+  const isLandingPage = location.pathname === '/' && !user && !loading
 
   if (configError) {
     return (
@@ -34,7 +37,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
-      <Navbar user={user} />
+      {!isLandingPage && <Navbar user={user} />}
       <main className="flex-1">
         <Routes>
           {/* Public attendee-facing routes */}
@@ -70,7 +73,7 @@ export default function App() {
             element={<Protected user={user} loading={loading}><SessionScan /></Protected>}
           />
 
-          <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+          <Route path="/" element={loading ? <div className="p-8 text-center text-mist">Loading…</div> : user ? <Navigate to="/dashboard" replace /> : <Landing />} />
           <Route path="*" element={<div className="p-8 text-center">Page not found.</div>} />
         </Routes>
       </main>

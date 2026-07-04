@@ -57,18 +57,19 @@ export default function EventDetail() {
     return () => supabase.removeChannel(channel)
   }, [id])
 
+  useEffect(() => {
+    if (!event || !user) return
+    if (event.owner_id === user.id) {
+      setMyRole('owner')
+    } else {
+      supabase.from('team_members').select('role').eq('event_id', id).eq('email', (user.email || '').toLowerCase()).maybeSingle()
+        .then(({ data: tm }) => setMyRole(tm?.role || null))
+    }
+  }, [event, user, id])
+
   async function load() {
     const { data: ev } = await supabase.from('events').select('*').eq('id', id).single()
     setEvent(ev)
-
-    if (ev && user) {
-      if (ev.owner_id === user.id) {
-        setMyRole('owner')
-      } else {
-        const { data: tm } = await supabase.from('team_members').select('role').eq('event_id', id).eq('email', (user.email || '').toLowerCase()).maybeSingle()
-        setMyRole(tm?.role || null)
-      }
-    }
 
     const { data: r } = await supabase.from('registrations').select('*').eq('event_id', id).order('created_at', { ascending: false })
     setRegs(r || [])
@@ -497,9 +498,16 @@ export default function EventDetail() {
         <div className="pt-5">
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <p className="text-sm font-medium text-ink mb-2">Public registration link</p>
-            <div className="flex gap-2">
-              <input readOnly value={registerLink} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            <div className="flex gap-2 flex-wrap">
+              <input readOnly value={registerLink} className="flex-1 min-w-[160px] border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               <button onClick={() => navigator.clipboard.writeText(registerLink)} className="text-sm border border-gray-300 rounded-lg px-3 hover:bg-gray-50">Copy</button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`You're invited to ${event.title}! Register here: ${registerLink}`)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="text-sm border border-green-300 text-green-700 rounded-lg px-3 py-2 hover:bg-green-50 flex items-center gap-1.5"
+              >
+                Share via WhatsApp
+              </a>
             </div>
           </div>
 

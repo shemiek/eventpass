@@ -40,8 +40,8 @@ export default function EventForm() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (isEdit) load()
-  }, [id])
+    if (isEdit && user) load()
+  }, [id, user])
 
   async function load() {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single()
