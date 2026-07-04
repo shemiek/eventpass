@@ -29,6 +29,14 @@ export default function EventDetail() {
     setLoading(false)
   }
 
+  async function checkOut(regId) {
+    const { error } = await supabase
+      .from('registrations')
+      .update({ checked_in: false, checked_in_at: null })
+      .eq('id', regId)
+    if (!error) load()
+  }
+
   function exportCsv() {
     if (!regs.length) return
     const keys = Array.from(new Set(regs.flatMap((r) => Object.keys(r.attendee_data || {}))))
@@ -103,6 +111,7 @@ export default function EventDetail() {
               <th className="p-3">Email</th>
               <th className="p-3">Ticket</th>
               <th className="p-3">Status</th>
+              <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -118,10 +127,20 @@ export default function EventDetail() {
                     <span className="text-mist">Registered</span>
                   )}
                 </td>
+                <td className="p-3 text-right">
+                  {r.checked_in && (
+                    <button
+                      onClick={() => checkOut(r.id)}
+                      className="text-xs text-stub border border-stub/30 rounded-md px-2 py-1 hover:bg-stub/5"
+                    >
+                      Check out
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {regs.length === 0 && (
-              <tr><td colSpan={4} className="p-6 text-center text-mist">No registrations yet.</td></tr>
+              <tr><td colSpan={5} className="p-6 text-center text-mist">No registrations yet.</td></tr>
             )}
           </tbody>
         </table>

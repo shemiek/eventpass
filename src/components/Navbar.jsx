@@ -14,7 +14,7 @@ export default function Navbar({ user }) {
       <div className="max-w-5xl mx-auto flex items-center justify-between px-4 py-3">
         <Link to="/" className="font-display font-semibold text-lg tracking-tight flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-gold inline-block" />
-          EventPass
+          EventoPass
         </Link>
         {user && (
           <nav className="flex items-center gap-4 text-sm">

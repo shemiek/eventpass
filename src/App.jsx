@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/useAuth'
+import { configError } from './lib/supabaseClient'
 import Navbar from './components/Navbar'
 
 import Login from './pages/Login'
@@ -18,6 +19,17 @@ function Protected({ user, loading, children }) {
 
 export default function App() {
   const { user, loading } = useAuth()
+
+  if (configError) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center p-6">
+        <div className="max-w-md bg-white border border-red-200 rounded-xl p-6">
+          <p className="font-display text-lg font-semibold text-ink mb-2">Configuration error</p>
+          <p className="text-sm text-ink/80">{configError}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
