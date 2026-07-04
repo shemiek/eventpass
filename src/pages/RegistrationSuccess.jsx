@@ -13,7 +13,8 @@ export default function RegistrationSuccess() {
   useEffect(() => { load() }, [code])
 
   async function load() {
-    const { data: reg, error } = await supabase.from('registrations').select('*').eq('ticket_code', code).single()
+    const { data: regRows, error } = await supabase.rpc('get_registration_by_ticket', { p_ticket_code: code })
+    const reg = regRows?.[0]
     if (error || !reg) { setNotFound(true); return }
     setRegistration(reg)
     const { data: ev } = await supabase.from('events').select('*').eq('id', reg.event_id).single()
@@ -36,6 +37,30 @@ export default function RegistrationSuccess() {
 
   if (notFound) return <p className="text-center mt-16 text-mist">Ticket not found.</p>
   if (!registration || !event) return <p className="text-center mt-16 text-mist">Loading…</p>
+
+  if (registration.status === 'pending') {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <h1 className="font-display text-xl font-semibold text-ink mb-2">{event.title}</h1>
+        <div className="bg-gold/10 border border-gold/30 rounded-xl p-6 mt-4">
+          <p className="font-medium text-ink mb-1">Registration pending approval</p>
+          <p className="text-sm text-mist">The organizer needs to approve your registration before your badge becomes available. Check back on this page later — bookmark it or save the link.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (registration.status === 'rejected') {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <h1 className="font-display text-xl font-semibold text-ink mb-2">{event.title}</h1>
+        <div className="bg-stub/10 border border-stub/30 rounded-xl p-6 mt-4">
+          <p className="font-medium text-ink mb-1">Registration not approved</p>
+          <p className="text-sm text-mist">Please contact the event organizer if you believe this is a mistake.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8">

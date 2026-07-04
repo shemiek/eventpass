@@ -3,6 +3,18 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import DynamicFormRenderer from '../components/DynamicFormRenderer'
 
+function formatRange(start, end) {
+  if (!start) return ''
+  const s = new Date(start)
+  if (!end) return s.toLocaleString()
+  const e = new Date(end)
+  const sameDay = s.toDateString() === e.toDateString()
+  if (sameDay) {
+    return `${s.toLocaleDateString()}, ${s.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – ${e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  }
+  return `${s.toLocaleString()} – ${e.toLocaleString()}`
+}
+
 export default function PublicRegister() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -32,13 +44,13 @@ export default function PublicRegister() {
     const { data: ss } = await supabase.from('sessions').select('*').eq('event_id', data.id).order('sort_order')
     setSessions(ss || [])
 
-    const { count } = await supabase.from('registrations').select('id', { count: 'exact', head: true }).eq('event_id', data.id)
+    const { data: count } = await supabase.rpc('get_event_registration_count', { p_event_id: data.id })
     setRegCount(count || 0)
 
     if (tt && tt.length) {
       const counts = {}
       for (const t of tt) {
-        const { count: c } = await supabase.from('registrations').select('id', { count: 'exact', head: true }).eq('event_id', data.id).eq('ticket_type_id', t.id)
+        const { data: c } = await supabase.rpc('get_tier_registration_count', { p_ticket_type_id: t.id })
         counts[t.id] = c || 0
       }
       setTierCounts(counts)
@@ -56,6 +68,7 @@ export default function PublicRegister() {
         ticket_code: ticketCode,
         ticket_type_id: tierId || null,
         session_ids: selectedSessions,
+        status: event.requires_approval ? 'pending' : 'approved',
         attendee_data: { name, email, ...values }
       })
       if (insErr) throw insErr
@@ -78,6 +91,16 @@ export default function PublicRegister() {
     return <p className="text-center mt-16 text-mist">This event isn't open for registration yet. Check back soon.</p>
   }
 
+  const deadlinePassed = event.registration_deadline && new Date() > new Date(event.registration_deadline)
+  if (deadlinePassed) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <h1 className="font-display text-xl font-semibold text-ink mb-2">{event.title}</h1>
+        <p className="text-mist">Registration for this event has closed.</p>
+      </div>
+    )
+  }
+
   const isFull = event.capacity != null && regCount >= event.capacity
   if (isFull) {
     return (
@@ -88,13 +111,21 @@ export default function PublicRegister() {
     )
   }
 
+  const mapUrl = event.location ? `https://www.google.com/maps?q=${encodeURIComponent(event.location)}&output=embed` : null
+
   return (
     <div className="max-w-lg mx-auto px-4 py-8 pb-16">
       {event.banner_url && <img src={event.banner_url} alt="" className="w-full h-44 object-cover rounded-xl mb-5" />}
       <h1 className="font-display text-2xl font-semibold text-ink">{event.title}</h1>
-      {event.event_date && <p className="text-mist text-sm mt-1">{new Date(event.event_date).toLocaleString()}</p>}
+      {event.event_date && <p className="text-mist text-sm mt-1">{formatRange(event.event_date, event.event_end_date)}</p>}
       {event.location && <p className="text-mist text-sm">{event.location}</p>}
       {event.description && <p className="text-ink/80 text-sm mt-3">{event.description}</p>}
+      {mapUrl && <iframe title="Event location" src={mapUrl} className="mt-3 w-full h-40 rounded-xl border border-gray-200" loading="lazy" />}
+      {event.requires_approval && (
+        <p className="text-xs text-mist mt-3 bg-gray-50 border border-gray-200 rounded-lg p-2">
+          This event requires organizer approval. You'll be able to check your ticket status any time using your confirmation link.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4 mt-6">
         <div>

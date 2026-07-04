@@ -17,21 +17,25 @@ export default function EventForm() {
   const isEdit = Boolean(id)
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [accessDenied, setAccessDenied] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [eventDate, setEventDate] = useState('')
+  const [eventEndDate, setEventEndDate] = useState('')
+  const [registrationDeadline, setRegistrationDeadline] = useState('')
   const [location, setLocation] = useState('')
   const [bannerFile, setBannerFile] = useState(null)
   const [bannerUrl, setBannerUrl] = useState('')
   const [status, setStatus] = useState('published')
   const [capacity, setCapacity] = useState('')
+  const [requiresApproval, setRequiresApproval] = useState(false)
   const [badgeAccent, setBadgeAccent] = useState('#1C2544')
   const [badgeFooter, setBadgeFooter] = useState('')
   const [fields, setFields] = useState([])
   const [tiers, setTiers] = useState([])
   const [sessions, setSessions] = useState([])
-  const [team, setTeam] = useState([]) // only usable once event exists (has an id)
+  const [team, setTeam] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -42,13 +46,25 @@ export default function EventForm() {
   async function load() {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single()
     if (error) { setError(error.message); return }
+
+    const isOwner = data.owner_id === user.id
+    let isManager = isOwner
+    if (!isOwner) {
+      const { data: tm } = await supabase.from('team_members').select('role').eq('event_id', id).eq('email', (user.email || '').toLowerCase()).maybeSingle()
+      isManager = tm?.role === 'manager'
+    }
+    if (!isManager) { setAccessDenied(true); return }
+
     setTitle(data.title)
     setDescription(data.description || '')
     setEventDate(data.event_date ? data.event_date.slice(0, 16) : '')
+    setEventEndDate(data.event_end_date ? data.event_end_date.slice(0, 16) : '')
+    setRegistrationDeadline(data.registration_deadline ? data.registration_deadline.slice(0, 16) : '')
     setLocation(data.location || '')
     setBannerUrl(data.banner_url || '')
     setStatus(data.status || 'published')
     setCapacity(data.capacity ?? '')
+    setRequiresApproval(Boolean(data.requires_approval))
     setBadgeAccent(data.badge_accent || '#1C2544')
     setBadgeFooter(data.badge_footer_text || '')
     setFields(data.form_schema || [])
@@ -80,10 +96,13 @@ export default function EventForm() {
         title,
         description,
         event_date: eventDate ? new Date(eventDate).toISOString() : null,
+        event_end_date: eventEndDate ? new Date(eventEndDate).toISOString() : null,
+        registration_deadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
         location,
         banner_url: finalBannerUrl,
         status,
         capacity: capacity === '' ? null : parseInt(capacity, 10),
+        requires_approval: requiresApproval,
         badge_accent: badgeAccent,
         badge_footer_text: badgeFooter,
         form_schema: fields
@@ -103,7 +122,6 @@ export default function EventForm() {
         eventId = data.id
       }
 
-      // Sync ticket tiers: delete removed, upsert the rest
       const { data: existingTiers } = await supabase.from('ticket_types').select('id').eq('event_id', eventId)
       const keepTierIds = tiers.filter(t => t.id).map(t => t.id)
       const removedTiers = (existingTiers || []).filter(t => !keepTierIds.includes(t.id)).map(t => t.id)
@@ -115,7 +133,6 @@ export default function EventForm() {
         else await supabase.from('ticket_types').insert(row)
       }
 
-      // Sync sessions
       const { data: existingSessions } = await supabase.from('sessions').select('id').eq('event_id', eventId)
       const keepSessionIds = sessions.filter(s => s.id).map(s => s.id)
       const removedSessions = (existingSessions || []).filter(s => !keepSessionIds.includes(s.id)).map(s => s.id)
@@ -135,8 +152,18 @@ export default function EventForm() {
     }
   }
 
+  const mapUrl = location.trim() ? `https://www.google.com/maps?q=${encodeURIComponent(location)}&output=embed` : null
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {accessDenied ? (
+        <div className="border border-stub/30 bg-stub/5 rounded-xl p-6 text-center">
+          <p className="font-display font-semibold text-ink mb-1">You don't have access to edit this event</p>
+          <p className="text-sm text-mist mb-4">Only the event owner or a manager can make changes here.</p>
+          <button onClick={() => navigate(`/events/${id}`)} className="text-sm bg-navy text-paper rounded-lg px-4 py-2">Back to event</button>
+        </div>
+      ) : (
+      <>
       <h1 className="font-display text-2xl font-semibold text-ink mb-6">
         {isEdit ? 'Edit event' : 'Create event'}
       </h1>
@@ -165,18 +192,41 @@ export default function EventForm() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-ink">Date & time</label>
+            <label className="text-sm font-medium text-ink">Starts</label>
             <input type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
           </div>
           <div>
-            <label className="text-sm font-medium text-ink">Location</label>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
+            <label className="text-sm font-medium text-ink">Ends <span className="font-normal text-mist">(optional)</span></label>
+            <input type="datetime-local" value={eventEndDate} onChange={(e) => setEventEndDate(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
           </div>
         </div>
 
         <div>
-          <label className="text-sm font-medium text-ink">Overall capacity <span className="font-normal text-mist">(blank = unlimited)</span></label>
-          <input type="number" min="0" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="e.g. 300" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
+          <label className="text-sm font-medium text-ink">Location</label>
+          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Full address works best for the map preview" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
+          {mapUrl && (
+            <iframe title="Location preview" src={mapUrl} className="mt-2 w-full h-40 rounded-lg border border-gray-200" loading="lazy" />
+          )}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium text-ink">Registration deadline <span className="font-normal text-mist">(optional)</span></label>
+            <input type="datetime-local" value={registrationDeadline} onChange={(e) => setRegistrationDeadline(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
+            <p className="text-xs text-mist mt-1">After this, the public link stops accepting new registrations.</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-ink">Overall capacity <span className="font-normal text-mist">(blank = unlimited)</span></label>
+            <input type="number" min="0" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="e.g. 300" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
+          <div>
+            <p className="text-sm font-medium text-ink">Require approval</p>
+            <p className="text-xs text-mist">Registrations stay pending until you approve them — attendees can't download or use their badge until then.</p>
+          </div>
+          <input type="checkbox" checked={requiresApproval} onChange={(e) => setRequiresApproval(e.target.checked)} className="w-5 h-5" />
         </div>
 
         <div>
@@ -223,6 +273,8 @@ export default function EventForm() {
           <label className="text-sm font-medium text-ink block mb-2">Team & roles</label>
           <TeamManager eventId={id} team={team} setTeam={setTeam} />
         </div>
+      )}
+      </>
       )}
     </div>
   )

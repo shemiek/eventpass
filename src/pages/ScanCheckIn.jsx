@@ -9,12 +9,16 @@ export default function ScanCheckIn() {
   const { user } = useAuth()
   const scannerRef = useRef(null)
   const [gate, setGate] = useState(() => localStorage.getItem('eventopass_gate') || '')
-  const [mode, setMode] = useState(() => localStorage.getItem('eventopass_scan_mode') || 'in') // 'in' | 'out'
+  const [mode, setMode] = useState(() => localStorage.getItem('eventopass_scan_mode') || 'in')
   const [result, setResult] = useState(null)
   const [scanning, setScanning] = useState(false)
   const busyRef = useRef(false)
   const modeRef = useRef(mode)
   const gateRef = useRef(gate)
+
+  const [search, setSearch] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => { localStorage.setItem('eventopass_gate', gate); gateRef.current = gate }, [gate])
   useEffect(() => { localStorage.setItem('eventopass_scan_mode', mode); modeRef.current = mode }, [mode])
@@ -45,12 +49,18 @@ export default function ScanCheckIn() {
   async function processTicket(ticketCode) {
     const { data: reg, error } = await supabase
       .from('registrations').select('*').eq('event_id', id).eq('ticket_code', ticketCode).maybeSingle()
-
     if (error || !reg) {
       setResult({ status: 'invalid', msg: 'Ticket not found for this event.' })
       return
     }
+    await processRegistration(reg)
+  }
 
+  async function processRegistration(reg) {
+    if (reg.status && reg.status !== 'approved') {
+      setResult({ status: 'invalid', name: reg.attendee_data?.name, msg: `Registration is ${reg.status} — not approved for check-in yet.` })
+      return
+    }
     if (modeRef.current === 'in') {
       if (reg.checked_in) {
         setResult({ status: 'duplicate', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Already checked in.' })
@@ -93,6 +103,27 @@ export default function ScanCheckIn() {
     if (code) await processTicket(code)
   }
 
+  async function runSearch(q) {
+    setSearch(q)
+    if (q.trim().length < 2) { setSearchResults([]); return }
+    setSearching(true)
+    const { data } = await supabase.from('registrations').select('*').eq('event_id', id)
+    const lower = q.toLowerCase()
+    const matches = (data || []).filter(r => {
+      const vals = Object.values(r.attendee_data || {}).map(v => String(v).toLowerCase())
+      return vals.some(v => v.includes(lower))
+    }).slice(0, 8)
+    setSearchResults(matches)
+    setSearching(false)
+  }
+
+  async function selectSearchResult(reg) {
+    setSearch('')
+    setSearchResults([])
+    await processRegistration(reg)
+    setTimeout(() => setResult(null), 2800)
+  }
+
   const bg =
     result?.status === 'ok' || result?.status === 'checkedout' ? 'bg-green-600' :
     result?.status === 'duplicate' ? 'bg-gold' :
@@ -104,24 +135,11 @@ export default function ScanCheckIn() {
       <h1 className="font-display text-xl font-semibold text-ink mt-2 mb-3">Scan attendees</h1>
 
       <div className="flex rounded-lg overflow-hidden border border-gray-300 mb-3">
-        <button
-          onClick={() => setMode('in')}
-          className={`flex-1 py-2 text-sm font-medium ${mode === 'in' ? 'bg-navy text-paper' : 'bg-white text-mist'}`}
-        >
-          Check-in mode
-        </button>
-        <button
-          onClick={() => setMode('out')}
-          className={`flex-1 py-2 text-sm font-medium ${mode === 'out' ? 'bg-stub text-white' : 'bg-white text-mist'}`}
-        >
-          Check-out mode
-        </button>
+        <button onClick={() => setMode('in')} className={`flex-1 py-2 text-sm font-medium ${mode === 'in' ? 'bg-navy text-paper' : 'bg-white text-mist'}`}>Check-in mode</button>
+        <button onClick={() => setMode('out')} className={`flex-1 py-2 text-sm font-medium ${mode === 'out' ? 'bg-stub text-white' : 'bg-white text-mist'}`}>Check-out mode</button>
       </div>
 
-      <input
-        value={gate} onChange={(e) => setGate(e.target.value)} placeholder="Gate / entrance name (optional, e.g. Main Entrance)"
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3"
-      />
+      <input value={gate} onChange={(e) => setGate(e.target.value)} placeholder="Gate / entrance name (optional, e.g. Main Entrance)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3" />
 
       <div id="qr-reader" className="rounded-xl overflow-hidden bg-black" />
 
@@ -139,7 +157,7 @@ export default function ScanCheckIn() {
       )}
 
       <p className="text-xs text-mist mt-4 text-center">
-        {mode === 'in' ? 'Scanning will check attendees in.' : 'Scanning will check attendees out.'} Switch modes above for the opposite flow (e.g. one staff member scans people in, another scans them out at a different exit).
+        {mode === 'in' ? 'Scanning will check attendees in.' : 'Scanning will check attendees out.'} Switch modes above for the opposite flow.
       </p>
 
       <div className="bg-white border border-gray-200 rounded-lg p-3 mt-4">
@@ -150,6 +168,28 @@ export default function ScanCheckIn() {
             {mode === 'in' ? 'Check in' : 'Check out'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-3 mt-3">
+        <p className="text-xs font-medium text-ink mb-2">Or search by name / mobile number:</p>
+        <input value={search} onChange={(e) => runSearch(e.target.value)} placeholder="Type a name or phone number…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        {searching && <p className="text-xs text-mist mt-2">Searching…</p>}
+        {searchResults.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {searchResults.map(r => (
+              <button
+                key={r.id}
+                onClick={() => selectSearchResult(r)}
+                className="w-full text-left flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-lg px-3 py-2 text-sm"
+              >
+                <span>
+                  {r.attendee_data?.name} <span className="text-mist text-xs">— {r.attendee_data?.phone || r.attendee_data?.mobile || r.attendee_data?.email}</span>
+                </span>
+                <span className={`text-xs ${r.checked_in ? 'text-green-700' : 'text-mist'}`}>{r.checked_in ? 'Inside' : 'Not inside'}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

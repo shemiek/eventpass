@@ -15,14 +15,31 @@ export default function Dashboard() {
 
   async function load() {
     setLoading(true)
-    // RLS ensures this only returns events the user owns or is staff on
-    const { data, error } = await supabase
-      .from('events')
-      .select('id, title, slug, event_date, banner_url, owner_id, status')
-      .order('created_at', { ascending: false })
-    if (!error) setEvents(data)
+    const fields = 'id, title, slug, event_date, banner_url, owner_id, status'
+
+    // Events I own
+    const { data: owned } = await supabase.from('events').select(fields).eq('owner_id', user.id)
+
+    // Events I've been added to as manager/scanner
+    const { data: memberships } = await supabase
+      .from('team_members')
+      .select(`role, events (${fields})`)
+      .eq('email', (user.email || '').toLowerCase())
+
+    const assigned = (memberships || [])
+      .map(m => m.events ? { ...m.events, myRole: m.role } : null)
+      .filter(Boolean)
+
+    const byId = {}
+    ;(owned || []).forEach(e => byId[e.id] = { ...e, myRole: 'owner' })
+    assigned.forEach(e => { if (!byId[e.id]) byId[e.id] = e })
+
+    const merged = Object.values(byId).sort((a, b) => new Date(b.event_date || 0) - new Date(a.event_date || 0))
+    setEvents(merged)
     setLoading(false)
   }
+
+  const roleLabel = { owner: 'Owner', manager: 'Manager', scanner: 'Scanner' }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -56,11 +73,12 @@ export default function Dashboard() {
               style={ev.banner_url ? { backgroundImage: `url(${ev.banner_url})` } : {}}
             />
             <div className="p-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-display font-semibold text-ink">{ev.title}</p>
                 {ev.status === 'draft' && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-mist font-medium">Draft</span>
                 )}
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-navy/10 text-navy font-medium">{roleLabel[ev.myRole] || 'Team'}</span>
               </div>
               <p className="text-sm text-mist mt-1">
                 {ev.event_date ? new Date(ev.event_date).toLocaleString() : 'Date TBD'}

@@ -5,21 +5,20 @@ Mobile-friendly event registration, custom forms, digital badges, and QR check-i
 ## What it does
 
 - **Ticket tiers** with per-tier capacity and optional pricing (e.g. VIP: 50 seats, General: 200)
-- **Multi-session agendas** — attendees pick which sessions they'll attend
-- **Draft/Published events** — hide an event from the public link until it's ready
-- **Overall capacity caps** with automatic "sold out" / registration-closed handling
-- **Role-based team access** — invite teammates by email as **Manager** (edit event, manage team, export data) or **Scanner** (check-in only); access activates the moment they sign up with that email
+- **Multi-session agendas** — attendees pick which sessions they'll attend, with a dedicated scan point per session
+- **Draft/Published events**, **registration deadlines**, and **overall capacity caps** with automatic closing
+- **Separate start/end date and time**, plus a **Google Maps preview** from the event address (no API key required)
+- **Optional approval workflow** — registrations stay pending until an organizer approves them; badges are withheld until then
+- **Role-based team access** — invite teammates by email as **Manager** (edit event, manage team, export data) or **Scanner** (check-in/out only, cannot edit); enforced both in the UI and at the database level
 - **Badge customization** — accent color and footer text per event
-- **Camera-based check-in AND check-out** with an explicit mode toggle on the scanner (switch between check-in and check-out flows), gate tracking, and a full audit trail
-- **Live multi-gate occupancy dashboard** — real-time count of who's currently inside, broken down per gate
-- **Per-attendee history** — expand any attendee to see their full check-in/out timeline, including which gate and which staff member scanned them
-- **Per-session attendance tracking** — separate scan point for each session/agenda item, independent of overall event check-in
-- **Re-entry and dwell-time tracking** — see how long each attendee spent on-site and how many times they re-entered, plus an occupancy-over-time chart
-- **Manual walk-in check-in** for attendees who didn't pre-register
-- **Bulk CSV import** of pre-registered attendees
-- **Search/filter/sort** the attendee table (by name, email, ticket code, status, tier)
-- **Analytics** — registrations-over-time chart and ticket tier breakdown
-- **CSV and Excel export** (Excel includes a Registrations sheet + a Summary sheet)
+- **Camera-based check-in AND check-out** with an explicit mode toggle, gate tracking, and full audit trail
+- **Live multi-gate occupancy dashboard** with an occupancy-over-time chart
+- **Per-attendee history** — full check-in/out timeline per person, plus dwell-time and re-entry tracking
+- **Per-session attendance tracking**, independent of overall event check-in
+- **Manual walk-in check-in**, **bulk CSV import**, and **name/mobile search** in the scanner (for when a QR code isn't available)
+- **Dashboard as its own tab** with toggleable widgets and **PDF/CSV export** of the summary metrics
+- **CSV and Excel export** of full attendee data (Excel includes a Registrations sheet + Summary sheet)
+- **Delete event**, with an explicit warning showing exactly how much data will be lost, gated to the event owner
 - **VIP flagging and notes**, visible in the attendee table and to staff during scanning
 
 Everything is a single responsive web app (installable as a PWA — "Add to Home Screen") so there's no App Store step.
@@ -31,8 +30,10 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 1. Go to https://supabase.com → create a free account → **New project**.
 2. Open **SQL Editor** → paste the entire contents of `supabase/schema.sql` → **Run**.
 3. Then run `supabase/schema_v2.sql` the same way — this adds ticket tiers, sessions, roles, check-in gates, and badge customization on top of the base schema.
-4. Then run `supabase/schema_v3.sql` — this adds per-session attendance tracking. (The occupancy dashboard, check-in history, and dwell-time features reuse the `check_events` table from schema_v2, so no extra migration is needed for those.)
-5. Go to **Project Settings → API**. Copy:
+4. Then run `supabase/schema_v3.sql` — this adds per-session attendance tracking.
+5. Then run `supabase/schema_v4.sql` — **fixes three real security bugs**: scanners being able to edit events, organizers' dashboards not being properly scoped to their own events, and the registrations table (attendee PII) being publicly readable beyond just "someone who knows one ticket code." Not optional — run this even on an existing setup.
+6. Then run `supabase/schema_v5.sql` — adds registration deadlines, event end date, and the approval workflow.
+7. Go to **Project Settings → API**. Copy:
    - **Project URL**
    - **anon public** key
 
