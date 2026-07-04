@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import EventForm from './pages/EventForm'
 import EventDetail from './pages/EventDetail'
 import ScanCheckIn from './pages/ScanCheckIn'
+import SessionScan from './pages/SessionScan'
 import PublicRegister from './pages/PublicRegister'
 import RegistrationSuccess from './pages/RegistrationSuccess'
 
@@ -63,6 +64,10 @@ export default function App() {
           <Route
             path="/events/:id/scan"
             element={<Protected user={user} loading={loading}><ScanCheckIn /></Protected>}
+          />
+          <Route
+            path="/events/:id/sessions/:sessionId/scan"
+            element={<Protected user={user} loading={loading}><SessionScan /></Protected>}
           />
 
           <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />

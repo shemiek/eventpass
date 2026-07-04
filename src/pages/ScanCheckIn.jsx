@@ -9,11 +9,15 @@ export default function ScanCheckIn() {
   const { user } = useAuth()
   const scannerRef = useRef(null)
   const [gate, setGate] = useState(() => localStorage.getItem('eventopass_gate') || '')
+  const [mode, setMode] = useState(() => localStorage.getItem('eventopass_scan_mode') || 'in') // 'in' | 'out'
   const [result, setResult] = useState(null)
   const [scanning, setScanning] = useState(false)
   const busyRef = useRef(false)
+  const modeRef = useRef(mode)
+  const gateRef = useRef(gate)
 
-  useEffect(() => { localStorage.setItem('eventopass_gate', gate) }, [gate])
+  useEffect(() => { localStorage.setItem('eventopass_gate', gate); gateRef.current = gate }, [gate])
+  useEffect(() => { localStorage.setItem('eventopass_scan_mode', mode); modeRef.current = mode }, [mode])
 
   useEffect(() => {
     const scanner = new Html5Qrcode('qr-reader')
@@ -34,48 +38,59 @@ export default function ScanCheckIn() {
   async function onScanSuccess(decodedText) {
     if (busyRef.current) return
     busyRef.current = true
-    const ticketCode = decodedText.trim().toUpperCase()
+    await processTicket(decodedText.trim().toUpperCase())
+    setTimeout(() => { busyRef.current = false; setResult(null) }, 2800)
+  }
 
+  async function processTicket(ticketCode) {
     const { data: reg, error } = await supabase
       .from('registrations').select('*').eq('event_id', id).eq('ticket_code', ticketCode).maybeSingle()
 
     if (error || !reg) {
       setResult({ status: 'invalid', msg: 'Ticket not found for this event.' })
-    } else if (reg.checked_in) {
-      setResult({ status: 'duplicate', regId: reg.id, name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Already checked in.' })
-    } else {
-      await doCheckIn(reg)
+      return
     }
-    setTimeout(() => { busyRef.current = false; setResult(null) }, 2800)
+
+    if (modeRef.current === 'in') {
+      if (reg.checked_in) {
+        setResult({ status: 'duplicate', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Already checked in.' })
+      } else {
+        await doCheckIn(reg)
+      }
+    } else {
+      if (!reg.checked_in) {
+        setResult({ status: 'duplicate', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Not currently checked in.' })
+      } else {
+        await doCheckOut(reg)
+      }
+    }
   }
 
   async function doCheckIn(reg) {
     const { error: updErr } = await supabase.from('registrations')
       .update({ checked_in: true, checked_in_at: new Date().toISOString() }).eq('id', reg.id)
     if (!updErr) {
-      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'in', gate_name: gate || null, staff_email: user?.email })
+      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'in', gate_name: gateRef.current || null, staff_email: user?.email })
       setResult({ status: 'ok', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Checked in.' })
     } else {
       setResult({ status: 'invalid', msg: 'Could not update: ' + updErr.message })
     }
   }
 
-  async function checkOutFromScan(regId, name) {
-    const { error } = await supabase.from('registrations').update({ checked_in: false, checked_in_at: null }).eq('id', regId)
-    if (!error) {
-      await supabase.from('check_events').insert({ registration_id: regId, direction: 'out', gate_name: gate || null, staff_email: user?.email })
-      setResult({ status: 'checkedout', name, msg: 'Checked out.' })
-      setTimeout(() => setResult(null), 1500)
+  async function doCheckOut(reg) {
+    const { error: updErr } = await supabase.from('registrations')
+      .update({ checked_in: false, checked_in_at: null }).eq('id', reg.id)
+    if (!updErr) {
+      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'out', gate_name: gateRef.current || null, staff_email: user?.email })
+      setResult({ status: 'checkedout', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Checked out.' })
+    } else {
+      setResult({ status: 'invalid', msg: 'Could not update: ' + updErr.message })
     }
   }
 
-  async function manualCheckIn() {
+  async function manualSubmit() {
     const code = document.getElementById('manualCode').value.trim().toUpperCase()
-    if (!code) return
-    const { data: reg } = await supabase.from('registrations').select('*').eq('event_id', id).eq('ticket_code', code).maybeSingle()
-    if (!reg) { setResult({ status: 'invalid', msg: 'Ticket not found for this event.' }); return }
-    if (reg.checked_in) { setResult({ status: 'duplicate', regId: reg.id, name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Already checked in.' }); return }
-    await doCheckIn(reg)
+    if (code) await processTicket(code)
   }
 
   const bg =
@@ -86,7 +101,22 @@ export default function ScanCheckIn() {
   return (
     <div className="max-w-md mx-auto px-4 py-6">
       <Link to={`/events/${id}`} className="text-sm text-navy underline">&larr; Back to event</Link>
-      <h1 className="font-display text-xl font-semibold text-ink mt-2 mb-3">Scan to check in</h1>
+      <h1 className="font-display text-xl font-semibold text-ink mt-2 mb-3">Scan attendees</h1>
+
+      <div className="flex rounded-lg overflow-hidden border border-gray-300 mb-3">
+        <button
+          onClick={() => setMode('in')}
+          className={`flex-1 py-2 text-sm font-medium ${mode === 'in' ? 'bg-navy text-paper' : 'bg-white text-mist'}`}
+        >
+          Check-in mode
+        </button>
+        <button
+          onClick={() => setMode('out')}
+          className={`flex-1 py-2 text-sm font-medium ${mode === 'out' ? 'bg-stub text-white' : 'bg-white text-mist'}`}
+        >
+          Check-out mode
+        </button>
+      </div>
 
       <input
         value={gate} onChange={(e) => setGate(e.target.value)} placeholder="Gate / entrance name (optional, e.g. Main Entrance)"
@@ -105,21 +135,20 @@ export default function ScanCheckIn() {
           </div>
           <p className="text-sm">{result.msg}</p>
           {result.notes && <p className="text-xs mt-1 opacity-90">Note: {result.notes}</p>}
-          {result.status === 'duplicate' && (
-            <button onClick={() => checkOutFromScan(result.regId, result.name)} className="mt-3 bg-white/90 text-ink text-sm font-medium rounded-lg px-4 py-1.5 hover:bg-white">
-              Check out instead
-            </button>
-          )}
         </div>
       )}
 
-      <p className="text-xs text-mist mt-4 text-center">Point the camera at the attendee's QR ticket. Scanning pauses briefly after each result.</p>
+      <p className="text-xs text-mist mt-4 text-center">
+        {mode === 'in' ? 'Scanning will check attendees in.' : 'Scanning will check attendees out.'} Switch modes above for the opposite flow (e.g. one staff member scans people in, another scans them out at a different exit).
+      </p>
 
       <div className="bg-white border border-gray-200 rounded-lg p-3 mt-4">
         <p className="text-xs font-medium text-ink mb-2">No camera? Enter a ticket code manually:</p>
         <div className="flex gap-2">
           <input id="manualCode" placeholder="e.g. 7F3K9QAZ" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          <button onClick={manualCheckIn} className="bg-navy text-paper rounded-lg px-3 py-2 text-sm">Check in</button>
+          <button onClick={manualSubmit} className={`rounded-lg px-3 py-2 text-sm text-white ${mode === 'in' ? 'bg-navy' : 'bg-stub'}`}>
+            {mode === 'in' ? 'Check in' : 'Check out'}
+          </button>
         </div>
       </div>
     </div>

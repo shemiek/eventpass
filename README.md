@@ -10,7 +10,11 @@ Mobile-friendly event registration, custom forms, digital badges, and QR check-i
 - **Overall capacity caps** with automatic "sold out" / registration-closed handling
 - **Role-based team access** — invite teammates by email as **Manager** (edit event, manage team, export data) or **Scanner** (check-in only); access activates the moment they sign up with that email
 - **Badge customization** — accent color and footer text per event
-- **Camera-based check-in** with gate tracking, plus a **check-out** option (timestamps logged per check-in/out event)
+- **Camera-based check-in AND check-out** with an explicit mode toggle on the scanner (switch between check-in and check-out flows), gate tracking, and a full audit trail
+- **Live multi-gate occupancy dashboard** — real-time count of who's currently inside, broken down per gate
+- **Per-attendee history** — expand any attendee to see their full check-in/out timeline, including which gate and which staff member scanned them
+- **Per-session attendance tracking** — separate scan point for each session/agenda item, independent of overall event check-in
+- **Re-entry and dwell-time tracking** — see how long each attendee spent on-site and how many times they re-entered, plus an occupancy-over-time chart
 - **Manual walk-in check-in** for attendees who didn't pre-register
 - **Bulk CSV import** of pre-registered attendees
 - **Search/filter/sort** the attendee table (by name, email, ticket code, status, tier)
@@ -27,7 +31,8 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 1. Go to https://supabase.com → create a free account → **New project**.
 2. Open **SQL Editor** → paste the entire contents of `supabase/schema.sql` → **Run**.
 3. Then run `supabase/schema_v2.sql` the same way — this adds ticket tiers, sessions, roles, check-in gates, and badge customization on top of the base schema.
-4. Go to **Project Settings → API**. Copy:
+4. Then run `supabase/schema_v3.sql` — this adds per-session attendance tracking. (The occupancy dashboard, check-in history, and dwell-time features reuse the `check_events` table from schema_v2, so no extra migration is needed for those.)
+5. Go to **Project Settings → API**. Copy:
    - **Project URL**
    - **anon public** key
 
