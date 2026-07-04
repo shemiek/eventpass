@@ -5,7 +5,10 @@ import { supabase } from '../lib/supabaseClient'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
+  const [fullName, setFullName] = useState('')
+  const [organization, setOrganization] = useState('')
+  const [phone, setPhone] = useState('')
+  const [mode, setMode] = useState('signin')
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
@@ -16,7 +19,10 @@ export default function Login() {
     setStatus(null)
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({ email, password })
+        const { error } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName, organization, phone } }
+        })
         if (error) throw error
         setStatus({ type: 'ok', msg: 'Account created. You can sign in now.' })
         setMode('signin')
@@ -39,6 +45,22 @@ export default function Login() {
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        {mode === 'signup' && (
+          <>
+            <div>
+              <label className="text-sm font-medium text-ink">Full name</label>
+              <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-navy outline-none" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-ink">Organization <span className="font-normal text-mist">(optional)</span></label>
+              <input value={organization} onChange={(e) => setOrganization(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-navy outline-none" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-ink">Phone <span className="font-normal text-mist">(optional)</span></label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-navy outline-none" />
+            </div>
+          </>
+        )}
         <div>
           <label className="text-sm font-medium text-ink">Email</label>
           <input

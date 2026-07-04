@@ -77,10 +77,14 @@ export default function ScanCheckIn() {
   }
 
   async function doCheckIn(reg) {
+    const { error: logErr } = await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'in', gate_name: gateRef.current || null, staff_email: user?.email })
+    if (logErr) {
+      setResult({ status: 'duplicate', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Already checked in (duplicate scan blocked).' })
+      return
+    }
     const { error: updErr } = await supabase.from('registrations')
       .update({ checked_in: true, checked_in_at: new Date().toISOString() }).eq('id', reg.id)
     if (!updErr) {
-      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'in', gate_name: gateRef.current || null, staff_email: user?.email })
       setResult({ status: 'ok', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Checked in.' })
     } else {
       setResult({ status: 'invalid', msg: 'Could not update: ' + updErr.message })
@@ -88,10 +92,14 @@ export default function ScanCheckIn() {
   }
 
   async function doCheckOut(reg) {
+    const { error: logErr } = await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'out', gate_name: gateRef.current || null, staff_email: user?.email })
+    if (logErr) {
+      setResult({ status: 'duplicate', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Already checked out (duplicate scan blocked).' })
+      return
+    }
     const { error: updErr } = await supabase.from('registrations')
       .update({ checked_in: false, checked_in_at: null }).eq('id', reg.id)
     if (!updErr) {
-      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'out', gate_name: gateRef.current || null, staff_email: user?.email })
       setResult({ status: 'checkedout', name: reg.attendee_data?.name, vip: reg.vip, notes: reg.notes, msg: 'Checked out.' })
     } else {
       setResult({ status: 'invalid', msg: 'Could not update: ' + updErr.message })

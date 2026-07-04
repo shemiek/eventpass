@@ -35,7 +35,13 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 4. Then run `supabase/schema_v3.sql` — this adds per-session attendance tracking.
 5. Then run `supabase/schema_v4.sql` — **fixes three real security bugs**: scanners being able to edit events, organizers' dashboards not being properly scoped to their own events, and the registrations table (attendee PII) being publicly readable beyond just "someone who knows one ticket code." Not optional — run this even on an existing setup.
 6. Then run `supabase/schema_v5.sql` — adds registration deadlines, event end date, and the approval workflow.
-7. Go to **Project Settings → API**. Copy:
+7. Then run `supabase/schema_v6.sql` — adds the platform admin portal, richer signup profiles, a hard guarantee against duplicate consecutive check-in/out events, and (importantly) enables Realtime replication on `registrations` and `check_events`, which is very likely why check-in status wasn't updating without a manual reload — creating a table via SQL doesn't automatically add it to Supabase's realtime publication.
+8. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
+   ```sql
+   insert into platform_admins (email) values ('you@example.com');
+   ```
+   There's no other way to bootstrap the very first admin — after that, admins can manage the list themselves from the database (there's no UI for adding/removing admins yet, intentionally, since it's a small, sensitive list).
+9. Go to **Project Settings → API**. Copy:
    - **Project URL**
    - **anon public** key
 

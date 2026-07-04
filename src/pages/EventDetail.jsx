@@ -173,8 +173,9 @@ export default function EventDetail() {
   }, [regs, search, statusFilter, tierFilter, sortBy])
 
   async function checkOut(regId) {
+    const { error: logErr } = await supabase.from('check_events').insert({ registration_id: regId, direction: 'out' })
+    if (logErr) return // already checked out (or a concurrent check-out just happened) — trigger blocked the duplicate, nothing more to do
     await supabase.from('registrations').update({ checked_in: false, checked_in_at: null }).eq('id', regId)
-    await supabase.from('check_events').insert({ registration_id: regId, direction: 'out' })
     load()
   }
 

@@ -1,8 +1,15 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
 export default function Navbar({ user }) {
   const navigate = useNavigate()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return }
+    supabase.rpc('is_platform_admin').then(({ data }) => setIsAdmin(Boolean(data)))
+  }, [user])
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -19,6 +26,7 @@ export default function Navbar({ user }) {
         {user && (
           <nav className="flex items-center gap-4 text-sm">
             <Link to="/dashboard" className="hover:text-gold transition-colors">Events</Link>
+            {isAdmin && <Link to="/admin" className="hover:text-gold transition-colors">Admin</Link>}
             <button onClick={signOut} className="hover:text-gold transition-colors">Sign out</button>
           </nav>
         )}
