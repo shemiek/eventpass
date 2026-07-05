@@ -103,7 +103,8 @@ export default function EventForm() {
     try {
       let finalBannerUrl = bannerUrl
       if (bannerFile) {
-        const path = `${user.id}/${Date.now()}-${bannerFile.name}`
+        const safeName = bannerFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+        const path = `${user.id}/${Date.now()}-${safeName}`
         const { error: upErr } = await supabase.storage.from('banners').upload(path, bannerFile, { upsert: true })
         if (upErr) throw upErr
         finalBannerUrl = supabase.storage.from('banners').getPublicUrl(path).data.publicUrl
