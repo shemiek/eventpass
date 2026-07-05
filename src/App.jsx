@@ -13,6 +13,7 @@ import SessionScan from './pages/SessionScan'
 import PublicRegister from './pages/PublicRegister'
 import RegistrationSuccess from './pages/RegistrationSuccess'
 import AdminPortal from './pages/AdminPortal'
+import OrgSettings from './pages/OrgSettings'
 
 function Protected({ user, loading, children }) {
   if (loading) return <div className="p-8 text-center text-mist">Loading…</div>
@@ -76,6 +77,10 @@ export default function App() {
           <Route
             path="/admin"
             element={<Protected user={user} loading={loading}><AdminPortal /></Protected>}
+          />
+          <Route
+            path="/organization"
+            element={<Protected user={user} loading={loading}><OrgSettings /></Protected>}
           />
 
           <Route path="/" element={loading ? <div className="p-8 text-center text-mist">Loading…</div> : user ? <Navigate to="/dashboard" replace /> : <Landing />} />

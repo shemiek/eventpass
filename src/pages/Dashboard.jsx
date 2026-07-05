@@ -15,12 +15,23 @@ export default function Dashboard() {
 
   async function load() {
     setLoading(true)
-    const fields = 'id, title, slug, event_date, banner_url, owner_id, status'
+    const fields = 'id, title, slug, event_date, banner_url, owner_id, org_id, status'
 
-    // Events I own
+    // Events I personally created (legacy / solo path)
     const { data: owned } = await supabase.from('events').select(fields).eq('owner_id', user.id)
 
-    // Events I've been added to as manager/scanner
+    // Events belonging to any organization I'm an admin of — this is what
+    // makes multi-admin orgs work: an org admin sees every event under the
+    // org, not just ones they personally clicked "create" on.
+    const { data: myOrgMemberships } = await supabase.from('organization_members').select('org_id').eq('user_id', user.id).eq('role', 'admin')
+    const orgIds = (myOrgMemberships || []).map(m => m.org_id)
+    let orgEvents = []
+    if (orgIds.length) {
+      const { data } = await supabase.from('events').select(fields).in('org_id', orgIds)
+      orgEvents = data || []
+    }
+
+    // Events I've been added to individually as manager/scanner (may belong to someone else's org)
     const { data: memberships } = await supabase
       .from('team_members')
       .select(`role, events (${fields})`)
@@ -32,6 +43,7 @@ export default function Dashboard() {
 
     const byId = {}
     ;(owned || []).forEach(e => byId[e.id] = { ...e, myRole: 'owner' })
+    orgEvents.forEach(e => { if (!byId[e.id]) byId[e.id] = { ...e, myRole: 'owner' } })
     assigned.forEach(e => { if (!byId[e.id]) byId[e.id] = e })
 
     const merged = Object.values(byId).sort((a, b) => new Date(b.event_date || 0) - new Date(a.event_date || 0))

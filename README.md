@@ -18,6 +18,7 @@ Mobile-friendly event registration, custom forms, digital badges, and QR check-i
 - **Manual walk-in check-in**, **bulk CSV import**, and **name/mobile search** in the scanner (for when a QR code isn't available)
 - **Dashboard as its own tab** with toggleable widgets and **PDF/CSV export** of the summary metrics
 - **CSV and Excel export** of full attendee data (Excel includes a Registrations sheet + Summary sheet)
+- **Organizations, not just solo owners** — every signup gets its own organization automatically; org admins have full access to every event under the org, and can invite co-admins by email. This is the real multi-tenant model everything else (billing, seats) will build on
 - **Public marketing landing page** at the root URL for signed-out visitors, with a dashboard redirect for logged-in users
 - **WhatsApp sharing** — share the registration link with invitees, or share an attendee's badge image directly via the native share sheet (falls back to a text link on desktop, where file-sharing isn't available)
 - **Delete event**, with an explicit warning showing exactly how much data will be lost, gated to the event owner
@@ -36,12 +37,13 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 5. Then run `supabase/schema_v4.sql` — **fixes three real security bugs**: scanners being able to edit events, organizers' dashboards not being properly scoped to their own events, and the registrations table (attendee PII) being publicly readable beyond just "someone who knows one ticket code." Not optional — run this even on an existing setup.
 6. Then run `supabase/schema_v5.sql` — adds registration deadlines, event end date, and the approval workflow.
 7. Then run `supabase/schema_v6.sql` — adds the platform admin portal, richer signup profiles, a hard guarantee against duplicate consecutive check-in/out events, and (importantly) enables Realtime replication on `registrations` and `check_events`, which is very likely why check-in status wasn't updating without a manual reload — creating a table via SQL doesn't automatically add it to Supabase's realtime publication.
-8. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
+8. Then run `supabase/schema_v7.sql` — converts tenancy from "one owner per event" to real organizations with multi-admin support. Safe to run on an existing database: it auto-creates one organization per existing event owner and backfills everything, so no events need manual re-assignment.
+9. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
    ```sql
    insert into platform_admins (email) values ('you@example.com');
    ```
    There's no other way to bootstrap the very first admin — after that, admins can manage the list themselves from the database (there's no UI for adding/removing admins yet, intentionally, since it's a small, sensitive list).
-9. Go to **Project Settings → API**. Copy:
+10. Go to **Project Settings → API**. Copy:
    - **Project URL**
    - **anon public** key
 

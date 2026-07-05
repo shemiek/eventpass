@@ -61,10 +61,17 @@ export default function EventDetail() {
     if (!event || !user) return
     if (event.owner_id === user.id) {
       setMyRole('owner')
-    } else {
-      supabase.from('team_members').select('role').eq('event_id', id).eq('email', (user.email || '').toLowerCase()).maybeSingle()
-        .then(({ data: tm }) => setMyRole(tm?.role || null))
+      return
     }
+    async function resolveRole() {
+      if (event.org_id) {
+        const { data: isOrgAdmin } = await supabase.rpc('is_org_admin', { p_org_id: event.org_id })
+        if (isOrgAdmin) { setMyRole('owner'); return }
+      }
+      const { data: tm } = await supabase.from('team_members').select('role').eq('event_id', id).eq('email', (user.email || '').toLowerCase()).maybeSingle()
+      setMyRole(tm?.role || null)
+    }
+    resolveRole()
   }, [event, user, id])
 
   async function load() {

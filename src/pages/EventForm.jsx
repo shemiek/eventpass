@@ -36,8 +36,21 @@ export default function EventForm() {
   const [tiers, setTiers] = useState([])
   const [sessions, setSessions] = useState([])
   const [team, setTeam] = useState([])
+  const [myOrgs, setMyOrgs] = useState([])
+  const [orgId, setOrgId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (user && !isEdit) {
+      supabase.from('organization_members').select('org_id, role, organizations(id, name)').eq('user_id', user.id).eq('role', 'admin')
+        .then(({ data }) => {
+          const orgs = (data || []).map(m => m.organizations).filter(Boolean)
+          setMyOrgs(orgs)
+          if (orgs.length === 1) setOrgId(orgs[0].id)
+        })
+    }
+  }, [user, isEdit])
 
   useEffect(() => {
     if (isEdit && user) load()
@@ -49,7 +62,11 @@ export default function EventForm() {
 
     const isOwner = data.owner_id === user.id
     let isManager = isOwner
-    if (!isOwner) {
+    if (!isManager && data.org_id) {
+      const { data: isOrgAdmin } = await supabase.rpc('is_org_admin', { p_org_id: data.org_id })
+      isManager = Boolean(isOrgAdmin)
+    }
+    if (!isManager) {
       const { data: tm } = await supabase.from('team_members').select('role').eq('event_id', id).eq('email', (user.email || '').toLowerCase()).maybeSingle()
       isManager = tm?.role === 'manager'
     }
@@ -115,7 +132,7 @@ export default function EventForm() {
       } else {
         const { data, error: insErr } = await supabase
           .from('events')
-          .insert({ ...payload, owner_id: user.id, slug: slugify(title) })
+          .insert({ ...payload, owner_id: user.id, org_id: orgId || null, slug: slugify(title) })
           .select()
           .single()
         if (insErr) throw insErr
@@ -167,6 +184,16 @@ export default function EventForm() {
       <h1 className="font-display text-2xl font-semibold text-ink mb-6">
         {isEdit ? 'Edit event' : 'Create event'}
       </h1>
+
+      {!isEdit && myOrgs.length > 1 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-3 mb-5">
+          <label className="text-sm font-medium text-ink">Organization</label>
+          <select value={orgId} onChange={(e) => setOrgId(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {myOrgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+          <p className="text-xs text-mist mt-1">This event will belong to the selected organization — every admin of that org will have full access to it.</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">

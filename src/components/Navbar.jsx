@@ -26,6 +26,7 @@ export default function Navbar({ user }) {
         {user && (
           <nav className="flex items-center gap-4 text-sm">
             <Link to="/dashboard" className="hover:text-gold transition-colors">Events</Link>
+            <Link to="/organization" className="hover:text-gold transition-colors">Organization</Link>
             {isAdmin && <Link to="/admin" className="hover:text-gold transition-colors">Admin</Link>}
             <button onClick={signOut} className="hover:text-gold transition-colors">Sign out</button>
           </nav>
