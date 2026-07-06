@@ -15,6 +15,7 @@ export default function EventDetail() {
   const { user } = useAuth()
   const [event, setEvent] = useState(null)
   const [myRole, setMyRole] = useState(null)
+  const [orgSuspended, setOrgSuspended] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -77,6 +78,10 @@ export default function EventDetail() {
   async function load() {
     const { data: ev } = await supabase.from('events').select('*').eq('id', id).single()
     setEvent(ev)
+    if (ev?.org_id) {
+      const { data: org } = await supabase.from('organizations').select('status').eq('id', ev.org_id).maybeSingle()
+      setOrgSuspended(org?.status === 'suspended')
+    }
 
     const { data: r } = await supabase.from('registrations').select('*').eq('event_id', id).order('created_at', { ascending: false })
     setRegs(r || [])

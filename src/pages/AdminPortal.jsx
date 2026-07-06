@@ -7,6 +7,7 @@ export default function AdminPortal() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [profiles, setProfiles] = useState([])
   const [events, setEvents] = useState([])
+  const [orgs, setOrgs] = useState([])
   const [regCounts, setRegCounts] = useState({})
   const [tab, setTab] = useState('signups')
 
@@ -27,6 +28,9 @@ export default function AdminPortal() {
     const { data: ev } = await supabase.from('events').select('*').order('created_at', { ascending: false })
     setEvents(ev || [])
 
+    const { data: orgData } = await supabase.from('organizations').select('*').order('created_at', { ascending: false })
+    setOrgs(orgData || [])
+
     if (ev && ev.length) {
       const counts = {}
       for (const e of ev) {
@@ -35,6 +39,21 @@ export default function AdminPortal() {
       }
       setRegCounts(counts)
     }
+  }
+
+  async function toggleOrgStatus(orgId, currentStatus) {
+    const newStatus = currentStatus === 'suspended' ? 'active' : 'suspended'
+    const { error } = await supabase.from('organizations').update({ status: newStatus }).eq('id', orgId)
+    if (error) alert('Could not update status: ' + error.message)
+    load()
+  }
+
+  function eventCountFor(orgId) {
+    return events.filter(e => e.org_id === orgId).length
+  }
+
+  function ownerEmailFor(ownerId) {
+    return profiles.find(p => p.id === ownerId)?.email
   }
 
   function organizerFor(ownerId) {
@@ -68,8 +87,46 @@ export default function AdminPortal() {
 
       <div className="flex gap-1 border-b border-gray-200 mb-5">
         <button onClick={() => setTab('signups')} className={`px-4 py-2 text-sm font-medium border-b-2 ${tab === 'signups' ? 'border-navy text-navy' : 'border-transparent text-mist'}`}>Sign-ups</button>
+        <button onClick={() => setTab('orgs')} className={`px-4 py-2 text-sm font-medium border-b-2 ${tab === 'orgs' ? 'border-navy text-navy' : 'border-transparent text-mist'}`}>Organizations</button>
         <button onClick={() => setTab('events')} className={`px-4 py-2 text-sm font-medium border-b-2 ${tab === 'events' ? 'border-navy text-navy' : 'border-transparent text-mist'}`}>Events</button>
       </div>
+
+      {tab === 'orgs' && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-mist">
+              <tr>
+                <th className="p-3">Organization</th>
+                <th className="p-3">Primary owner</th>
+                <th className="p-3">Events</th>
+                <th className="p-3">Status</th>
+                <th className="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {orgs.map(o => (
+                <tr key={o.id} className="border-t border-gray-100">
+                  <td className="p-3">{o.name}</td>
+                  <td className="p-3 text-xs text-mist">{ownerEmailFor(o.primary_owner_id) || '—'}</td>
+                  <td className="p-3">{eventCountFor(o.id)}</td>
+                  <td className="p-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${o.status === 'suspended' ? 'bg-stub/10 text-stub' : 'bg-green-100 text-green-700'}`}>{o.status}</span>
+                  </td>
+                  <td className="p-3 text-right">
+                    <button
+                      onClick={() => toggleOrgStatus(o.id, o.status)}
+                      className={`text-xs rounded-md px-2 py-1 border ${o.status === 'suspended' ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-stub/30 text-stub hover:bg-stub/5'}`}
+                    >
+                      {o.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {orgs.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-mist">No organizations yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {tab === 'signups' && (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">

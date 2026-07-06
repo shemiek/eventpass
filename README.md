@@ -38,7 +38,8 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 6. Then run `supabase/schema_v5.sql` — adds registration deadlines, event end date, and the approval workflow.
 7. Then run `supabase/schema_v6.sql` — adds the platform admin portal, richer signup profiles, a hard guarantee against duplicate consecutive check-in/out events, and (importantly) enables Realtime replication on `registrations` and `check_events`, which is very likely why check-in status wasn't updating without a manual reload — creating a table via SQL doesn't automatically add it to Supabase's realtime publication.
 8. Then run `supabase/schema_v7.sql` — converts tenancy from "one owner per event" to real organizations with multi-admin support. Safe to run on an existing database: it auto-creates one organization per existing event owner and backfills everything, so no events need manual re-assignment.
-9. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
+9. Then run `supabase/schema_v8.sql` — adds organization lifecycle management (suspend/reactivate an org, a primary owner concept, ownership transfer, and protection against ever orphaning an organization) plus a tamper-proof audit log that only database triggers can write to, never the client directly.
+10. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
    ```sql
    insert into platform_admins (email) values ('you@example.com');
    ```
