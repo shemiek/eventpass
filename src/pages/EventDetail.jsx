@@ -35,6 +35,13 @@ export default function EventDetail() {
   const [sortBy, setSortBy] = useState('created_desc')
 
   const [showWalkIn, setShowWalkIn] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailBody, setEmailBody] = useState('')
+  const [emailIncludeBadge, setEmailIncludeBadge] = useState(true)
+  const [emailScope, setEmailScope] = useState('filtered') // 'filtered' | 'all'
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailResult, setEmailResult] = useState(null)
   const [walkInName, setWalkInName] = useState('')
   const [walkInEmail, setWalkInEmail] = useState('')
   const [walkInTier, setWalkInTier] = useState('')
@@ -185,7 +192,7 @@ export default function EventDetail() {
   }, [regs, search, statusFilter, tierFilter, sortBy])
 
   async function checkOut(regId) {
-    const { error: logErr } = await supabase.from('check_events').insert({ registration_id: regId, direction: 'out' })
+    const { error: logErr } = await supabase.from('check_events').insert({ registration_id: regId, direction: 'out', staff_email: user?.email })
     if (logErr) return // already checked out (or a concurrent check-out just happened) — trigger blocked the duplicate, nothing more to do
     await supabase.from('registrations').update({ checked_in: false, checked_in_at: null }).eq('id', regId)
     load()
@@ -218,7 +225,7 @@ export default function EventDetail() {
       checked_in: true, checked_in_at: new Date().toISOString()
     }).select().single()
     if (!error) {
-      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'in', gate_name: 'Walk-in' })
+      await supabase.from('check_events').insert({ registration_id: reg.id, direction: 'in', gate_name: 'Walk-in', staff_email: user?.email })
       setShowWalkIn(false); setWalkInName(''); setWalkInEmail(''); setWalkInTier(''); setWalkInVip(false)
       load()
     }
@@ -307,6 +314,31 @@ export default function EventDetail() {
     regs.forEach(r => { const name = tierName(r.ticket_type_id) || 'General'; counts[name] = (counts[name] || 0) + 1 })
     return Object.entries(counts).map(([name, count]) => ({ name, count }))
   }, [regs, tiers])
+
+  async function sendEmail() {
+    setEmailSending(true)
+    setEmailResult(null)
+    const targetRegs = emailScope === 'all' ? regs : filteredRegs
+    const registrationIds = targetRegs.filter(r => r.status === 'approved').map(r => r.id)
+    if (!registrationIds.length) {
+      setEmailResult({ error: 'No approved attendees in the selected scope to email.' })
+      setEmailSending(false)
+      return
+    }
+    const { data, error } = await supabase.functions.invoke('send-attendee-email', {
+      body: {
+        eventId: id,
+        registrationIds,
+        subject: emailSubject,
+        message: emailBody,
+        includeBadgeLink: emailIncludeBadge,
+        siteUrl: window.location.origin
+      }
+    })
+    setEmailSending(false)
+    if (error) { setEmailResult({ error: error.message }); return }
+    setEmailResult({ sent: data.sent, failed: data.failed })
+  }
 
   function sessionAttendeeCount(sessionId) {
     return new Set(sessionAttendance.filter(sa => sa.session_id === sessionId).map(sa => sa.registration_id)).size
@@ -545,6 +577,7 @@ export default function EventDetail() {
             <h2 className="font-display font-semibold text-ink">Attendees ({filteredRegs.length}{filteredRegs.length !== regs.length ? ` of ${regs.length}` : ''})</h2>
             <div className="flex gap-3 items-center flex-wrap">
               <button onClick={() => setShowWalkIn(true)} className="text-sm bg-gold text-ink font-medium rounded-lg px-3 py-1.5">+ Walk-in check-in</button>
+              {canManage && <button onClick={() => setShowEmailModal(true)} className="text-sm border border-navy text-navy rounded-lg px-3 py-1.5">Email attendees</button>}
               <label className="text-sm text-navy underline cursor-pointer">
                 {importBusy ? 'Importing…' : 'Bulk import CSV'}
                 <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" disabled={importBusy} />
@@ -643,6 +676,38 @@ export default function EventDetail() {
                 {filteredRegs.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-mist">No matching registrations.</td></tr>}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-20">
+          <div className="bg-white rounded-xl p-5 max-w-md w-full">
+            <p className="font-display font-semibold text-ink mb-3">Email attendees</p>
+            <label className="text-xs text-mist">Send to</label>
+            <select value={emailScope} onChange={(e) => setEmailScope(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+              <option value="filtered">Currently filtered attendees ({filteredRegs.filter(r => r.status === 'approved').length} approved)</option>
+              <option value="all">All approved attendees ({regs.filter(r => r.status === 'approved').length})</option>
+            </select>
+            <label className="text-xs text-mist">Subject</label>
+            <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} placeholder="e.g. Important info for tomorrow" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3" />
+            <label className="text-xs text-mist">Message</label>
+            <textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={5} placeholder="Instructions, updates, reminders…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3" />
+            <label className="flex items-center gap-2 text-sm mb-3">
+              <input type="checkbox" checked={emailIncludeBadge} onChange={(e) => setEmailIncludeBadge(e.target.checked)} /> Include a link to view their badge
+            </label>
+            {emailResult?.error && <p className="text-sm text-stub mb-3">{emailResult.error}</p>}
+            {emailResult?.sent != null && <p className="text-sm text-green-700 mb-3">Sent to {emailResult.sent}{emailResult.failed ? `, ${emailResult.failed} failed` : ''}.</p>}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setShowEmailModal(false); setEmailResult(null) }} className="text-sm px-3 py-1.5 rounded-lg border border-gray-300">Close</button>
+              <button
+                disabled={emailSending || !emailSubject.trim() || !emailBody.trim()}
+                onClick={sendEmail}
+                className="text-sm px-3 py-1.5 rounded-lg bg-navy text-paper disabled:opacity-40"
+              >
+                {emailSending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       )}

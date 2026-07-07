@@ -39,14 +39,40 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 7. Then run `supabase/schema_v6.sql` — adds the platform admin portal, richer signup profiles, a hard guarantee against duplicate consecutive check-in/out events, and (importantly) enables Realtime replication on `registrations` and `check_events`, which is very likely why check-in status wasn't updating without a manual reload — creating a table via SQL doesn't automatically add it to Supabase's realtime publication.
 8. Then run `supabase/schema_v7.sql` — converts tenancy from "one owner per event" to real organizations with multi-admin support. Safe to run on an existing database: it auto-creates one organization per existing event owner and backfills everything, so no events need manual re-assignment.
 9. Then run `supabase/schema_v8.sql` — adds organization lifecycle management (suspend/reactivate an org, a primary owner concept, ownership transfer, and protection against ever orphaning an organization) plus a tamper-proof audit log that only database triggers can write to, never the client directly.
-10. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
+10. Then run `supabase/schema_v9.sql` — adds a customizable ticket-type field label, an optional map toggle, and prep for the email-attendees audit action.
+11. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
    ```sql
    insert into platform_admins (email) values ('you@example.com');
    ```
    There's no other way to bootstrap the very first admin — after that, admins can manage the list themselves from the database (there's no UI for adding/removing admins yet, intentionally, since it's a small, sensitive list).
-10. Go to **Project Settings → API**. Copy:
+12. Go to **Project Settings → API**. Copy:
    - **Project URL**
    - **anon public** key
+
+## 1b. Set up emailing attendees (optional, requires two extra steps)
+
+This is the first feature that needs a real backend function instead of just the database — sending email requires a secret API key that can never live in frontend code, so it runs as a Supabase Edge Function instead.
+
+1. **Create a free Resend account** at https://resend.com and grab an API key (Dashboard → API Keys). Their free tier covers a generous volume for getting started; you can send from `onboarding@resend.dev` immediately without verifying your own domain, though verifying your own domain later is recommended so emails don't land in spam.
+2. **Install the Supabase CLI** (once) and log in:
+   ```bash
+   npm install -g supabase
+   supabase login
+   ```
+3. **Link this project to your Supabase project** (find your project ref in the Supabase dashboard URL, e.g. `mswvhsghbrxpnfprzwqj`):
+   ```bash
+   supabase link --project-ref YOUR_PROJECT_REF
+   ```
+4. **Set the secret** (never commit this key anywhere):
+   ```bash
+   supabase secrets set RESEND_API_KEY=your_resend_api_key_here
+   ```
+5. **Deploy the function**:
+   ```bash
+   supabase functions deploy send-attendee-email
+   ```
+
+That's it — the "Email attendees" button on an event's Attendees tab will work once this is deployed. If you skip this section, the rest of the app works exactly as before; you'll just get a clear error message if you click "Email attendees" without it set up.
 
 ## 2. Configure the app
 

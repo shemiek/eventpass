@@ -213,6 +213,8 @@ function describeAction(a) {
     case 'ownership_transferred': return `transferred primary ownership to ${a.details.to_email}`
     case 'org_status_changed': return `changed org status to ${a.details.new_status}`
     case 'event_deleted': return `deleted event "${a.details.title}"`
+    case 'attendee_email_sent': return `emailed ${a.details.sent} attendee(s)${a.details.failed ? ` (${a.details.failed} failed)` : ''} — "${a.details.subject}"`
+    case 'organization_deleted': return `deleted the organization "${a.details.name}"`
     default: return a.action
   }
 }

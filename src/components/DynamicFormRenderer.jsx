@@ -44,7 +44,7 @@ export default function DynamicFormRenderer({ fields, values, setValues }) {
             </div>
           )}
 
-          {['text', 'email', 'phone'].includes(f.type) && (
+          {['text', 'email', 'phone', 'date'].includes(f.type) && (
             <input
               type={f.type === 'phone' ? 'tel' : f.type}
               required={f.required}

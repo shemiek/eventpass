@@ -30,6 +30,9 @@ export default function EventForm() {
   const [status, setStatus] = useState('published')
   const [capacity, setCapacity] = useState('')
   const [requiresApproval, setRequiresApproval] = useState(false)
+  const [ticketLabel, setTicketLabel] = useState('Ticket type')
+  const [ticketRequired, setTicketRequired] = useState(true)
+  const [showMap, setShowMap] = useState(true)
   const [badgeAccent, setBadgeAccent] = useState('#1C2544')
   const [badgeFooter, setBadgeFooter] = useState('')
   const [fields, setFields] = useState([])
@@ -82,6 +85,9 @@ export default function EventForm() {
     setStatus(data.status || 'published')
     setCapacity(data.capacity ?? '')
     setRequiresApproval(Boolean(data.requires_approval))
+    setTicketLabel(data.ticket_label || 'Ticket type')
+    setTicketRequired(data.ticket_required !== false)
+    setShowMap(data.show_map !== false)
     setBadgeAccent(data.badge_accent || '#1C2544')
     setBadgeFooter(data.badge_footer_text || '')
     setFields(data.form_schema || [])
@@ -121,6 +127,9 @@ export default function EventForm() {
         status,
         capacity: capacity === '' ? null : parseInt(capacity, 10),
         requires_approval: requiresApproval,
+        ticket_label: ticketLabel || 'Ticket type',
+        ticket_required: ticketRequired,
+        show_map: showMap,
         badge_accent: badgeAccent,
         badge_footer_text: badgeFooter,
         form_schema: fields
@@ -171,6 +180,7 @@ export default function EventForm() {
   }
 
   const mapUrl = location.trim() ? `https://www.google.com/maps?q=${encodeURIComponent(location)}&output=embed` : null
+  const mapLinkUrl = location.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}` : null
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -231,9 +241,15 @@ export default function EventForm() {
 
         <div>
           <label className="text-sm font-medium text-ink">Location</label>
-          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Full address works best for the map preview" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
-          {mapUrl && (
-            <iframe title="Location preview" src={mapUrl} className="mt-2 w-full h-40 rounded-lg border border-gray-200" loading="lazy" />
+          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Full address works best — e.g. '350 5th Ave, New York, NY 10118'" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" />
+          <label className="flex items-center gap-2 text-xs text-mist mt-2">
+            <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} /> Show a map preview on the registration page
+          </label>
+          {showMap && mapUrl && (
+            <>
+              <iframe title="Location preview" src={mapUrl} className="mt-2 w-full h-40 rounded-lg border border-gray-200" loading="lazy" />
+              <a href={mapLinkUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-navy underline mt-1 inline-block">Open in Google Maps to verify this looks right ↗</a>
+            </>
           )}
         </div>
 
@@ -276,6 +292,15 @@ export default function EventForm() {
 
         <div>
           <label className="text-sm font-medium text-ink block mb-2">Ticket tiers <span className="font-normal text-mist">(optional — leave empty for a single free ticket type)</span></label>
+          <div className="flex gap-3 mb-2 flex-wrap">
+            <div className="flex-1 min-w-[160px]">
+              <label className="text-xs text-mist">Field label shown to attendees</label>
+              <input value={ticketLabel} onChange={(e) => setTicketLabel(e.target.value)} placeholder="e.g. Ticket type, Pass, Registration category" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-mist mt-5">
+              <input type="checkbox" checked={ticketRequired} onChange={(e) => setTicketRequired(e.target.checked)} /> Require a selection
+            </label>
+          </div>
           <TicketTierBuilder tiers={tiers} setTiers={setTiers} />
         </div>
 

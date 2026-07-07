@@ -112,15 +112,21 @@ export default function PublicRegister() {
   }
 
   const mapUrl = event.location ? `https://www.google.com/maps?q=${encodeURIComponent(event.location)}&output=embed` : null
+  const mapLinkUrl = event.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}` : null
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8 pb-16">
       {event.banner_url && <img src={event.banner_url} alt="" className="w-full h-44 object-cover rounded-xl mb-5" />}
       <h1 className="font-display text-2xl font-semibold text-ink">{event.title}</h1>
       {event.event_date && <p className="text-mist text-sm mt-1">{formatRange(event.event_date, event.event_end_date)}</p>}
-      {event.location && <p className="text-mist text-sm">{event.location}</p>}
+      {event.location && (
+        <p className="text-mist text-sm">
+          {event.location}
+          {mapLinkUrl && <a href={mapLinkUrl} target="_blank" rel="noopener noreferrer" className="text-navy underline ml-2">Get directions ↗</a>}
+        </p>
+      )}
       {event.description && <p className="text-ink/80 text-sm mt-3">{event.description}</p>}
-      {mapUrl && <iframe title="Event location" src={mapUrl} className="mt-3 w-full h-40 rounded-xl border border-gray-200" loading="lazy" />}
+      {event.show_map !== false && mapUrl && <iframe title="Event location" src={mapUrl} className="mt-3 w-full h-40 rounded-xl border border-gray-200" loading="lazy" />}
       {event.requires_approval && (
         <p className="text-xs text-mist mt-3 bg-gray-50 border border-gray-200 rounded-lg p-2">
           This event requires organizer approval. You'll be able to check your ticket status any time using your confirmation link.
@@ -139,7 +145,7 @@ export default function PublicRegister() {
 
         {tiers.length > 0 && (
           <div>
-            <label className="text-sm font-medium text-ink">Ticket type *</label>
+            <label className="text-sm font-medium text-ink">{event.ticket_label || 'Ticket type'} {event.ticket_required !== false && '*'}</label>
             <div className="mt-1 space-y-2">
               {tiers.map(t => {
                 const taken = tierCounts[t.id] ?? 0
@@ -147,7 +153,7 @@ export default function PublicRegister() {
                 return (
                   <label key={t.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 text-sm ${soldOut ? 'opacity-50 border-gray-200' : 'border-gray-300 cursor-pointer'}`}>
                     <span className="flex items-center gap-2">
-                      <input type="radio" name="tier" required disabled={soldOut} checked={tierId === t.id} onChange={() => setTierId(t.id)} />
+                      <input type="radio" name="tier" required={event.ticket_required !== false} disabled={soldOut} checked={tierId === t.id} onChange={() => setTierId(t.id)} />
                       {t.name} {t.price != null && <span className="text-mist">— ${Number(t.price).toFixed(2)}</span>}
                     </span>
                     <span className="text-xs text-mist">{soldOut ? 'Sold out' : t.capacity != null ? `${t.capacity - taken} left` : ''}</span>

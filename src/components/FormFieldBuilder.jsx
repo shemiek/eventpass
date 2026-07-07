@@ -1,4 +1,4 @@
-const FIELD_TYPES = ['text', 'email', 'phone', 'select', 'checkbox', 'textarea']
+const FIELD_TYPES = ['text', 'email', 'phone', 'date', 'select', 'checkbox', 'textarea']
 
 export default function FormFieldBuilder({ fields, setFields }) {
   function addField() {
