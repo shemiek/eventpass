@@ -40,7 +40,8 @@ Everything is a single responsive web app (installable as a PWA — "Add to Home
 8. Then run `supabase/schema_v7.sql` — converts tenancy from "one owner per event" to real organizations with multi-admin support. Safe to run on an existing database: it auto-creates one organization per existing event owner and backfills everything, so no events need manual re-assignment.
 9. Then run `supabase/schema_v8.sql` — adds organization lifecycle management (suspend/reactivate an org, a primary owner concept, ownership transfer, and protection against ever orphaning an organization) plus a tamper-proof audit log that only database triggers can write to, never the client directly.
 10. Then run `supabase/schema_v9.sql` — adds a customizable ticket-type field label, an optional map toggle, and prep for the email-attendees audit action.
-11. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
+11. Then run `supabase/schema_v10.sql` — adds platform-level account deactivation, and fixes a real security gap where event creation never verified you actually belong to the organization you were attaching the event to.
+12. **Make yourself the first platform admin** by running this in the SQL Editor, with your own email:
    ```sql
    insert into platform_admins (email) values ('you@example.com');
    ```
@@ -70,6 +71,10 @@ This is the first feature that needs a real backend function instead of just the
 5. **Deploy the function**:
    ```bash
    supabase functions deploy send-attendee-email
+   ```
+6. **Deploy the second function** (platform-level account deactivation, used from the Admin Portal — no extra secrets needed beyond what's already set):
+   ```bash
+   supabase functions deploy admin-deactivate-user
    ```
 
 That's it — the "Email attendees" button on an event's Attendees tab will work once this is deployed. If you skip this section, the rest of the app works exactly as before; you'll just get a clear error message if you click "Email attendees" without it set up.

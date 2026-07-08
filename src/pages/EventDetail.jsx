@@ -6,6 +6,7 @@ import jsPDF from 'jspdf'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/useAuth'
+import TicketBadge from '../components/TicketBadge'
 
 const DEFAULT_WIDGETS = { stats: true, occupancy: true, trend: true, tierBreakdown: true, occupancyOverTime: true, sessions: true }
 
@@ -42,6 +43,11 @@ export default function EventDetail() {
   const [emailScope, setEmailScope] = useState('filtered') // 'filtered' | 'all'
   const [emailSending, setEmailSending] = useState(false)
   const [emailResult, setEmailResult] = useState(null)
+  const [badgeModalReg, setBadgeModalReg] = useState(null)
+  const [showDuplicate, setShowDuplicate] = useState(false)
+  const [dupDate, setDupDate] = useState('')
+  const [dupCopyAttendees, setDupCopyAttendees] = useState(true)
+  const [dupBusy, setDupBusy] = useState(false)
   const [walkInName, setWalkInName] = useState('')
   const [walkInEmail, setWalkInEmail] = useState('')
   const [walkInTier, setWalkInTier] = useState('')
@@ -207,6 +213,66 @@ export default function EventDetail() {
     load()
   }
 
+  async function duplicateEvent() {
+    setDupBusy(true)
+    try {
+      const newSlug = event.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Math.random().toString(36).slice(2, 5)
+      const { data: newEvent, error: insErr } = await supabase.from('events').insert({
+        title: event.title,
+        description: event.description,
+        location: event.location,
+        banner_url: event.banner_url,
+        badge_accent: event.badge_accent,
+        badge_footer_text: event.badge_footer_text,
+        ticket_label: event.ticket_label,
+        ticket_required: event.ticket_required,
+        show_map: event.show_map,
+        form_schema: event.form_schema,
+        capacity: event.capacity,
+        requires_approval: event.requires_approval,
+        status: 'draft',
+        event_date: dupDate ? new Date(dupDate).toISOString() : null,
+        owner_id: user.id,
+        org_id: event.org_id,
+        slug: newSlug
+      }).select().single()
+      if (insErr) throw insErr
+
+      // Copy ticket tiers, keeping a map of old tier id -> new tier id so
+      // copied registrations can be re-pointed at the right new tier.
+      const tierIdMap = {}
+      for (const t of tiers) {
+        const { data: newTier } = await supabase.from('ticket_types').insert({
+          event_id: newEvent.id, name: t.name, capacity: t.capacity, price: t.price, sort_order: 0
+        }).select().single()
+        if (newTier) tierIdMap[t.id] = newTier.id
+      }
+
+      if (dupCopyAttendees) {
+        for (const r of regs) {
+          await supabase.from('registrations').insert({
+            event_id: newEvent.id,
+            ticket_code: crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase(),
+            ticket_type_id: r.ticket_type_id ? (tierIdMap[r.ticket_type_id] || null) : null,
+            vip: r.vip,
+            notes: r.notes,
+            status: r.status === 'rejected' ? 'rejected' : (event.requires_approval ? 'pending' : 'approved'),
+            attendee_data: r.attendee_data
+            // checked_in / checked_in_at / session_ids intentionally left at
+            // their defaults — this is a fresh occurrence with no check-in
+            // history of its own yet.
+          })
+        }
+      }
+
+      navigate(`/events/${newEvent.id}`)
+    } catch (err) {
+      alert('Could not duplicate event: ' + err.message)
+    } finally {
+      setDupBusy(false)
+    }
+  }
+
   async function deleteEvent() {
     setDeleting(true)
     const { error } = await supabase.from('events').delete().eq('id', id)
@@ -292,6 +358,20 @@ export default function EventDetail() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Registrations')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Summary')
     XLSX.writeFile(wb, `${event.slug}-registrations.xlsx`)
+  }
+
+  function exportCheckEventsLog() {
+    if (!checkEvents.length) { alert('No check-in/out events recorded yet.'); return }
+    const header = ['name', 'email', 'ticket_code', 'direction', 'gate', 'staff_email', 'at']
+    const rows = checkEvents.map(ev => {
+      const reg = regs.find(r => r.id === ev.registration_id)
+      return [
+        reg?.attendee_data?.name || '', reg?.attendee_data?.email || '', reg?.ticket_code || '',
+        ev.direction, ev.gate_name || '', ev.staff_email || '', ev.at
+      ].map(v => JSON.stringify(v ?? ''))
+    })
+    const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n')
+    downloadBlob(csv, `${event.slug}-checkin-log.csv`, 'text/csv')
   }
 
   function downloadBlob(content, filename, type) {
@@ -397,10 +477,32 @@ export default function EventDetail() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {canManage && <Link to={`/events/${id}/edit`} className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50">Edit / Team</Link>}
+          {canManage && <button onClick={() => setShowDuplicate(true)} className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50">Duplicate event</button>}
           <Link to={`/events/${id}/scan`} className="text-sm bg-navy text-paper rounded-lg px-3 py-1.5 hover:bg-ink">Scan check-in/out</Link>
           {myRole === 'owner' && <button onClick={() => setShowDelete(true)} className="text-sm border border-stub/40 text-stub rounded-lg px-3 py-1.5 hover:bg-stub/5">Delete event</button>}
         </div>
       </div>
+
+      {showDuplicate && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-30">
+          <div className="bg-white rounded-xl p-5 max-w-sm w-full">
+            <p className="font-display font-semibold text-ink mb-1">Duplicate "{event.title}"</p>
+            <p className="text-xs text-mist mb-3">Creates a new event with the same form, ticket tiers, and badge design — perfect for a recurring meeting or series. The new event is created as a draft so you can review it before opening registration.</p>
+            <label className="text-xs text-mist">Date & time of the next occurrence</label>
+            <input type="datetime-local" value={dupDate} onChange={(e) => setDupDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 mb-3" />
+            <label className="flex items-center gap-2 text-sm mb-4">
+              <input type="checkbox" checked={dupCopyAttendees} onChange={(e) => setDupCopyAttendees(e.target.checked)} />
+              Copy the {regs.length} attendee{regs.length === 1 ? '' : 's'} from this event too (fresh check-in status, new ticket codes)
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowDuplicate(false)} className="text-sm px-3 py-1.5 rounded-lg border border-gray-300">Cancel</button>
+              <button disabled={dupBusy} onClick={duplicateEvent} className="text-sm px-3 py-1.5 rounded-lg bg-navy text-paper disabled:opacity-50">
+                {dupBusy ? 'Creating…' : 'Create duplicate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDelete && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-30">
@@ -584,6 +686,7 @@ export default function EventDetail() {
               </label>
               <button onClick={exportCsv} className="text-sm text-navy underline">Export CSV</button>
               <button onClick={exportExcel} className="text-sm text-navy underline">Export Excel</button>
+              <button onClick={exportCheckEventsLog} className="text-sm text-navy underline">Export check-in/out log</button>
             </div>
           </div>
           {importMsg && <p className="text-sm text-mist mb-3">{importMsg}</p>}
@@ -653,7 +756,8 @@ export default function EventDetail() {
                             </>
                           )}
                           {r.checked_in && <button onClick={() => checkOut(r.id)} className="text-xs text-stub border border-stub/30 rounded-md px-2 py-1 hover:bg-stub/5 mr-2">Check out</button>}
-                          {d.eventCount > 0 && <button onClick={() => setExpandedReg(isExpanded ? null : r.id)} className="text-xs text-navy underline">{isExpanded ? 'Hide' : 'History'}</button>}
+                          {d.eventCount > 0 && <button onClick={() => setExpandedReg(isExpanded ? null : r.id)} className="text-xs text-navy underline mr-2">{isExpanded ? 'Hide' : 'History'}</button>}
+                          {r.status === 'approved' && <button onClick={() => setBadgeModalReg(r)} className="text-xs text-navy underline">Badge</button>}
                         </td>
                       </tr>
                       {isExpanded && (
@@ -712,6 +816,28 @@ export default function EventDetail() {
         </div>
       )}
 
+      {badgeModalReg && (
+        <BadgeModal
+          event={event}
+          registration={badgeModalReg}
+          tierName={tierName(badgeModalReg.ticket_type_id)}
+          onClose={() => setBadgeModalReg(null)}
+          onEmail={async () => {
+            await supabase.functions.invoke('send-attendee-email', {
+              body: {
+                eventId: id,
+                registrationIds: [badgeModalReg.id],
+                subject: `Your badge for ${event.title}`,
+                message: 'Here is your badge for the event.',
+                includeBadgeLink: true,
+                siteUrl: window.location.origin
+              }
+            })
+            alert('Badge email sent (or attempted — check the org audit log for the result).')
+          }}
+        />
+      )}
+
       {showWalkIn && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-20">
           <div className="bg-white rounded-xl p-5 max-w-sm w-full">
@@ -743,6 +869,59 @@ function Stat({ label, value }) {
     <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
       <p className="font-display text-2xl font-semibold text-ink">{value}</p>
       <p className="text-xs text-mist uppercase tracking-wide">{label}</p>
+    </div>
+  )
+}
+
+function BadgeModal({ event, registration, tierName, onClose, onEmail }) {
+  const [busy, setBusy] = useState(false)
+
+  async function renderCanvas() {
+    const html2canvas = (await import('html2canvas')).default
+    const node = document.getElementById('ticket-badge')
+    return html2canvas(node, { backgroundColor: '#F4F1EC', scale: 2 })
+  }
+
+  async function download() {
+    setBusy(true)
+    const canvas = await renderCanvas()
+    const link = document.createElement('a')
+    link.download = `badge-${registration.ticket_code}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+    setBusy(false)
+  }
+
+  async function share() {
+    setBusy(true)
+    const shareText = `Badge for ${registration.attendee_data?.name} — ${event.title}`
+    try {
+      const canvas = await renderCanvas()
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      const file = new File([blob], `badge-${registration.ticket_code}.png`, { type: 'image/png' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: event.title, text: shareText })
+        setBusy(false)
+        return
+      }
+    } catch (err) { /* fall through to link-only share below */ }
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText + ' — ' + window.location.origin + '/ticket/' + registration.ticket_code)}`, '_blank')
+    setBusy(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-30">
+      <div className="bg-white rounded-xl p-5 max-w-sm w-full">
+        <TicketBadge event={event} registration={registration} tierName={tierName} />
+        <div className="flex gap-2 justify-center flex-wrap mt-4">
+          <button disabled={busy} onClick={download} className="text-sm bg-navy text-paper rounded-lg px-3 py-1.5 disabled:opacity-50">Download</button>
+          <button disabled={busy} onClick={share} className="text-sm border border-green-300 text-green-700 rounded-lg px-3 py-1.5 disabled:opacity-50">Share via WhatsApp</button>
+          <button disabled={busy} onClick={onEmail} className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 disabled:opacity-50">Email to attendee</button>
+        </div>
+        <div className="text-center mt-3">
+          <button onClick={onClose} className="text-xs text-mist underline">Close</button>
+        </div>
+      </div>
     </div>
   )
 }

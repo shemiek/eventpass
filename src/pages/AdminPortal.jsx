@@ -48,6 +48,15 @@ export default function AdminPortal() {
     load()
   }
 
+  async function toggleUserActive(profileId, currentlyDeactivated) {
+    if (!confirm(currentlyDeactivated ? 'Reactivate this account?' : 'Deactivate this account? They will be signed out and unable to log in anywhere on the platform.')) return
+    const { data, error } = await supabase.functions.invoke('admin-deactivate-user', {
+      body: { targetUserId: profileId, deactivate: !currentlyDeactivated }
+    })
+    if (error || data?.error) { alert('Could not update account: ' + (data?.error || error.message)); return }
+    load()
+  }
+
   function eventCountFor(orgId) {
     return events.filter(e => e.org_id === orgId).length
   }
@@ -138,19 +147,31 @@ export default function AdminPortal() {
                 <th className="p-3">Organization</th>
                 <th className="p-3">Phone</th>
                 <th className="p-3">Joined</th>
+                <th className="p-3"></th>
               </tr>
             </thead>
             <tbody>
               {profiles.map(p => (
                 <tr key={p.id} className="border-t border-gray-100">
-                  <td className="p-3">{p.full_name || '—'}</td>
+                  <td className="p-3">
+                    {p.full_name || '—'}
+                    {p.is_deactivated && <span className="ml-1.5 text-[10px] bg-stub/10 text-stub px-1.5 py-0.5 rounded-full">Deactivated</span>}
+                  </td>
                   <td className="p-3">{p.email}</td>
                   <td className="p-3">{p.organization || '—'}</td>
                   <td className="p-3">{p.phone || '—'}</td>
                   <td className="p-3 text-xs text-mist">{new Date(p.created_at).toLocaleString()}</td>
+                  <td className="p-3 text-right">
+                    <button
+                      onClick={() => toggleUserActive(p.id, p.is_deactivated)}
+                      className={`text-xs rounded-md px-2 py-1 border ${p.is_deactivated ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-stub/30 text-stub hover:bg-stub/5'}`}
+                    >
+                      {p.is_deactivated ? 'Reactivate' : 'Deactivate'}
+                    </button>
+                  </td>
                 </tr>
               ))}
-              {profiles.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-mist">No sign-ups yet.</td></tr>}
+              {profiles.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-mist">No sign-ups yet.</td></tr>}
             </tbody>
           </table>
         </div>

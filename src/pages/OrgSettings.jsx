@@ -215,6 +215,8 @@ function describeAction(a) {
     case 'event_deleted': return `deleted event "${a.details.title}"`
     case 'attendee_email_sent': return `emailed ${a.details.sent} attendee(s)${a.details.failed ? ` (${a.details.failed} failed)` : ''} — "${a.details.subject}"`
     case 'organization_deleted': return `deleted the organization "${a.details.name}"`
+    case 'user_deactivated': return `deactivated a user account`
+    case 'user_reactivated': return `reactivated a user account`
     default: return a.action
   }
 }
